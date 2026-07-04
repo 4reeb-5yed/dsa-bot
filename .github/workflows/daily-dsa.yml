@@ -1,0 +1,32 @@
+name: Daily DSA
+
+on:
+  schedule:
+    - cron: '17 9 * * *'  # Run at 09:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-dsa-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dsa-bot
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run dsa-bot
+        env:
+          BANK_REPO_PAT: ${{ secrets.BANK_REPO_PAT }}
+          PUBLIC_REPO_PAT: ${{ secrets.PUBLIC_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: python scripts/pick_and_commit.py
