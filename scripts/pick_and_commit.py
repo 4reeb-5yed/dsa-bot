@@ -223,7 +223,7 @@ def main():
         run_cmd(f"git checkout -b {branch_name}", cwd=public_tmp)
         run_cmd(f"git add solutions/ tests/ README.md", cwd=public_tmp)
         run_cmd(
-            f'git -c user.name="dsa-bot" -c user.email="dsa-bot@users.noreply.github.com" '
+            f'git -c user.name="4reeb-5yed" -c user.email="284557362+4reeb-5yed@users.noreply.github.com" '
             f'commit -m "Day {day_str}: {title} ({topic}, {difficulty})"',
             cwd=public_tmp
         )
@@ -284,7 +284,7 @@ def main():
         
         run_cmd(f"git add progress/state.json", cwd=dsa_bot_tmp)
         run_cmd(
-            f'git -c user.name="dsa-bot" -c user.email="dsa-bot@users.noreply.github.com" '
+            f'git -c user.name="4reeb-5yed" -c user.email="284557362+4reeb-5yed@users.noreply.github.com" '
             f'commit -m "Update state: completed Day {day_str}"',
             cwd=dsa_bot_tmp
         )
