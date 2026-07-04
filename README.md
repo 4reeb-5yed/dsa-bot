@@ -2,6 +2,8 @@
 
 The **orchestrator** for the 100-Days-of-DSA automation system — the engine that drives everything.
 
+📖 **[Pipeline Build Guide](https://4reeb-5yed.github.io/100-days-of-dsa/)** — Step-by-step instructions to build this CI/CD system
+
 ## Related Repos
 
 | Repo | Role |
