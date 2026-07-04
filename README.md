@@ -2,6 +2,13 @@
 
 The **orchestrator** for the 100-Days-of-DSA automation system — the engine that drives everything.
 
+## Related Repos
+
+| Repo | Role |
+|------|------|
+| **[dsa-question-bank](https://github.com/4reeb-5yed/dsa-question-bank)** | Content bank — reads problems from here |
+| **[100-days-of-dsa](https://github.com/4reeb-5yed/100-days-of-dsa)** | Output repo — writes solutions/tests, opens PRs here |
+
 ## Overview
 
 This repository handles the automated daily workflow:
@@ -75,7 +82,4 @@ BANK_REPO_PAT=xxx PUBLIC_REPO_PAT=yyy python scripts/pick_and_commit.py
 └──────────────────────┘      └─────────────────┘      └──────────────────────┘
 ```
 
-## Related Repos
 
-- **[dsa-question-bank](https://github.com/4reeb-5yed/dsa-question-bank)** — Content bank with 120 DSA problems
-- **[100-days-of-dsa](https://github.com/4reeb-5yed/100-days-of-dsa)** — Output repo with solutions
