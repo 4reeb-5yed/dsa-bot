@@ -22,12 +22,16 @@ This repository handles the automated daily workflow:
 ## Repository Structure
 
 ```
-├── .github/workflows/daily-dsa.yml   # Scheduled GitHub Actions workflow
+├── Dockerfile                        # Container definition
+├── docker-compose.yml               # Easy local running
+├── .env.example                     # Environment variables template
+├── .dockerignore                    # Docker build exclusions
+├── .github/workflows/daily-dsa.yml  # Scheduled GitHub Actions workflow
 ├── scripts/
-│   └── pick_and_commit.py           # Main automation script
+│   └── pick_and_commit.py          # Main automation script
 ├── progress/
-│   └── state.json                   # Tracks completed problems
-└── requirements.txt                 # Python dependencies
+│   └── state.json                  # Tracks completed problems
+└── requirements.txt                # Python dependencies
 ```
 
 ## How It Works
@@ -60,6 +64,25 @@ Set these in **GitHub Actions secrets**:
 | `GITHUB_TOKEN` | Auto-provided by GitHub Actions | Default |
 
 ## Running Locally
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Clone the repo
+git clone https://github.com/4reeb-5yed/dsa-bot.git
+cd dsa-bot
+
+# Create a .env file with your tokens
+cp .env.example .env  # (create this file with your tokens)
+# Edit .env with:
+# BANK_REPO_PAT=your_token_here
+# PUBLIC_REPO_PAT=your_token_here
+
+# Run with Docker Compose
+docker-compose up
+```
+
+### Option 2: Python directly
 
 ```bash
 pip install -r requirements.txt

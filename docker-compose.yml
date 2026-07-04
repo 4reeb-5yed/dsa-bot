@@ -1,0 +1,14 @@
+# docker-compose.yml for dsa-bot
+# Easy local setup - just run: docker-compose up
+
+services:
+  dsa-bot:
+    build: .
+    environment:
+      - REPO_OWNER=${REPO_OWNER:-4reeb-5yed}
+      # Note: In production, use GitHub Secrets, not hardcoded values!
+      - BANK_REPO_PAT=${BANK_REPO_PAT:?BANK_REPO_PAT required}
+      - PUBLIC_REPO_PAT=${PUBLIC_REPO_PAT:?PUBLIC_REPO_PAT required}
+    volumes:
+      # Persist state between runs
+      - ./progress:/app/progress
