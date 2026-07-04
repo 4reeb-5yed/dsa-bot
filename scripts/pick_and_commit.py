@@ -101,6 +101,7 @@ def main():
     day = state["next_index"] + 1
     day_str = f"{day:03d}"
     slug = entry["slug"]
+    module_slug = slug.replace("-", "_")  # hyphens invalid in Python identifiers
     title = entry["title"]
     topic = entry["topic"]
     difficulty = entry["difficulty"]
@@ -115,20 +116,22 @@ def main():
     try:
         run_cmd(f"git clone {PUBLIC_REPO} {public_tmp}")
 
-        # Write solution file
+        # Write solution file (use underscores for Python module name)
         sol_dir = Path(public_tmp) / "solutions"
         sol_dir.mkdir(exist_ok=True)
-        sol_file = sol_dir / f"day_{day_str}_{slug}.py"
+        sol_file = sol_dir / f"day_{day_str}_{module_slug}.py"
         with open(sol_file, 'w') as f:
             f.write(solution_code)
         print(f"Wrote {sol_file}")
 
-        # Write test file
+        # Write test file - need to fix the import line to use underscores
         test_dir = Path(public_tmp) / "tests"
         test_dir.mkdir(exist_ok=True)
-        test_file = test_dir / f"test_day_{day_str}_{slug}.py"
+        test_file = test_dir / f"test_day_{day_str}_{module_slug}.py"
+        # Fix import in test_code: replace hyphens with underscores in the import line
+        fixed_test_code = test_code.replace(f"day_{day_str}_{slug}", f"day_{day_str}_{module_slug}")
         with open(test_file, 'w') as f:
-            f.write(test_code)
+            f.write(fixed_test_code)
         print(f"Wrote {test_file}")
 
         # Update README progress table
@@ -151,7 +154,7 @@ def main():
         env = os.environ.copy()
         env["PYTHONPATH"] = public_tmp
         test_result = subprocess.run(
-            f"cd {public_tmp} && python -m pytest tests/test_day_{day_str}_{slug}.py -v",
+            f"cd {public_tmp} && python -m pytest tests/test_day_{day_str}_{module_slug}.py -v",
             shell=True,
             capture_output=True,
             text=True,
