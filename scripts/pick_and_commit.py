@@ -11,6 +11,7 @@ import os
 import tempfile
 import subprocess
 import shutil
+import time
 from pathlib import Path
 from datetime import datetime, date
 
@@ -55,6 +56,54 @@ def run_cmd(cmd, cwd=None, env=None, check=True):
         print(f"stderr: {result.stderr}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, cmd)
     return result.stdout.strip()
+
+
+def wait_for_ci_pass(repo, branch_name, gh_token, timeout_secs=300, poll_interval=10):
+    """
+    Poll the CI check status for a PR/branch.
+    Returns True if CI passed, False if CI failed or timed out.
+    """
+    print(f"Waiting for CI checks on {repo} branch {branch_name}...")
+    deadline = time.time() + timeout_secs
+    env = {**os.environ, "GH_TOKEN": gh_token}
+
+    while time.time() < deadline:
+        # Get status checks for the branch
+        result = subprocess.run(
+            f'gh api repos/{repo}/commits/{branch_name}/check-runs --paginate',
+            shell=True, capture_output=True, text=True, env=env
+        )
+        if result.returncode == 0:
+            import json
+            try:
+                data = json.loads(result.stdout)
+                check_runs = data.get('check_runs', [])
+
+                if not check_runs:
+                    print("No check runs yet, waiting...")
+                else:
+                    all_concluded = all(c['status'] == 'completed' for c in check_runs)
+                    print(f"Check runs: {len(check_runs)}, all concluded: {all_concluded}")
+
+                    if all_concluded:
+                        # Check if any failed
+                        failed = [c for c in check_runs if c['conclusion'] == 'failure']
+                        if failed:
+                            print(f"CI FAILED: {[c['name'] for c in failed]}")
+                            return False
+                        # Check if all passed
+                        passed = all(c['conclusion'] == 'success' for c in check_runs)
+                        if passed:
+                            print("CI PASSED!")
+                            return True
+            except json.JSONDecodeError:
+                pass
+
+        print(f"Still waiting... (polling every {poll_interval}s)")
+        time.sleep(poll_interval)
+
+    print(f"CI check timed out after {timeout_secs}s")
+    return False
 
 
 def main():
@@ -180,10 +229,10 @@ def main():
         )
         run_cmd(f"git push origin {branch_name}", cwd=public_tmp)
 
-        # Create and merge PR using gh
+        # Create PR using gh
         print("\nCreating PR...")
         pr_body = f"Automated daily DSA solution. Verified passing before merge.\n\nProblem: {title}\nTopic: {topic}\nDifficulty: {difficulty}"
-        
+
         run_cmd(
             f'gh pr create --repo {REPO_OWNER}/100-days-of-dsa '
             f'--title "Day {day_str}: {title}" '
@@ -192,10 +241,20 @@ def main():
             env={**os.environ, "GH_TOKEN": PUBLIC_REPO_PAT}
         )
 
-        print("Merging PR...")
+        # Wait for CI to pass before merging
+        ci_passed = wait_for_ci_pass(f"{REPO_OWNER}/100-days-of-dsa", branch_name, PUBLIC_REPO_PAT)
+
+        if not ci_passed:
+            print("CI FAILED or TIMED OUT - leaving PR open for inspection", file=sys.stderr)
+            print("NOT merging. Progress/state.json will NOT be updated.", file=sys.stderr)
+            # Exit with error - do NOT advance state
+            sys.exit(1)
+
+        # CI passed - merge the PR
+        print("CI passed! Merging PR...")
         run_cmd(
             f'gh pr merge --repo {REPO_OWNER}/100-days-of-dsa '
-            f'--squash --delete-branch --admin {branch_name}',
+            f'--squash --delete-branch {branch_name}',
             env={**os.environ, "GH_TOKEN": PUBLIC_REPO_PAT}
         )
 
