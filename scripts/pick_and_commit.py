@@ -40,6 +40,21 @@ def save_state(state_path, state):
         json.dump(state, f, indent=2)
 
 
+def redact_cmd(cmd):
+    """Redact sensitive tokens from command string before logging."""
+    # Collect all tokens to redact
+    tokens_to_redact = [
+        os.environ.get("BANK_REPO_PAT", ""),
+        os.environ.get("PUBLIC_REPO_PAT", ""),
+        os.environ.get("GITHUB_TOKEN", ""),
+    ]
+    redacted = cmd
+    for token in tokens_to_redact:
+        if token and token in redacted:
+            redacted = redacted.replace(token, "***REDACTED***")
+    return redacted
+
+
 def run_cmd(cmd, cwd=None, env=None, check=True):
     """Run a command and return stdout."""
     result = subprocess.run(
@@ -51,7 +66,7 @@ def run_cmd(cmd, cwd=None, env=None, check=True):
         text=True
     )
     if check and result.returncode != 0:
-        print(f"ERROR: Command failed: {cmd}", file=sys.stderr)
+        print(f"ERROR: Command failed: {redact_cmd(cmd)}", file=sys.stderr)
         print(f"stdout: {result.stdout}", file=sys.stderr)
         print(f"stderr: {result.stderr}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, cmd)
