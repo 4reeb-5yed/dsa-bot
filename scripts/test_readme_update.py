@@ -173,5 +173,110 @@ def test_readme_update():
         return 0
 
 
+
+
+def count_tests_in_test_code(test_code):
+    """Count test functions in test_code using same convention as pick_and_commit.py"""
+    return test_code.count("\ndef test_")
+
+
+def simulate_test_count_calculation(existing_test_files, new_test_code):
+    """Simulate the test_count calculation from pick_and_commit.py"""
+    test_count = 0
+    for content in existing_test_files:
+        test_count += content.count("\ndef test_")
+    test_count += count_tests_in_test_code(new_test_code)
+    return test_count
+
+
+def test_test_count_calculation():
+    """
+    Regression test for off-by-one bug in test-count badge calculation.
+    
+    Bug: Old code used test_count += 1 assuming 1 test per day.
+    Fix: Use test_count += test_code.count("\ndef test_") to get actual count.
+    """
+    print()
+    print("=" * 70)
+    print("REGRESSION TEST: Test-count calculation")
+    print("=" * 70)
+    print()
+    
+    # Fixture: 4 existing days with 2 tests each = 8 tests total
+    existing_files = [
+        """from solutions.day_001_two_sum import two_sum
+
+def test_two_sum_basic():
+    assert two_sum([2, 7, 11, 15], 9) == [0, 1]
+
+def test_two_sum_negative():
+    assert two_sum([-1, -2, -3, -4, -5], -8) == [2, 4]
+""",
+        """from solutions.day_002_contains_duplicate import contains_duplicate
+
+def test_contains_duplicate_true():
+    assert contains_duplicate([1, 2, 3, 1]) == True
+
+def test_contains_duplicate_false():
+    assert contains_duplicate([1, 2, 3, 4]) == False
+""",
+        """from solutions.day_003_valid_anagram import is_anagram
+
+def test_is_anagram_basic():
+    assert is_anagram("anagram", "nagaram") == True
+
+def test_is_anagram_false():
+    assert is_anagram("rat", "car") == False
+""",
+        """from solutions.day_004_best_time import max_profit
+
+def test_max_profit_basic():
+    assert max_profit([7, 1, 5, 3, 6, 4]) == 5
+
+def test_max_profit_decreasing():
+    assert max_profit([7, 6, 4, 3, 1]) == 0
+""",
+    ]
+    
+    # New day test_code with 2 tests
+    new_test_code = """from solutions.day_005_new_problem import new_function
+
+def test_new_function_case1():
+    assert new_function([1, 2, 3]) == expected
+
+def test_new_function_case2():
+    assert new_function([]) == None
+"""
+    
+    # Expected: 4 files * 2 tests + 2 new tests = 10
+    expected_tests = (len(existing_files) * 2) + 2
+    
+    print("Existing test files:", len(existing_files))
+    print("  Each file contains 2 tests")
+    print("  Total from existing:", len(existing_files) * 2, "tests")
+    print()
+    print("New day test_code contains 2 tests")
+    print()
+    
+    actual_count = simulate_test_count_calculation(existing_files, new_test_code)
+    
+    print("Expected test count:", expected_tests)
+    print("Calculated test count:", actual_count)
+    print()
+    
+    if actual_count == expected_tests:
+        print("[PASS] TEST PASSED: Test count calculation is correct")
+        print("=" * 70)
+        return 0
+    else:
+        print("[FAIL] TEST FAILED: Expected", expected_tests, ", got", actual_count)
+        print("=" * 70)
+        return 1
+
+
 if __name__ == '__main__':
-    sys.exit(test_readme_update())
+    # Run both tests
+    result1 = test_readme_update()
+    print()
+    result2 = test_test_count_calculation()
+    sys.exit(result1 or result2)

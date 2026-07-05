@@ -320,11 +320,12 @@ def main():
                 for test_file in tests_dir.glob("test_day_*.py"):
                     try:
                         content = test_file.read_text()
-                        test_count += content.count("\\ndef test_")
+                        test_count += content.count("\ndef test_")
                     except Exception:
                         pass
-                # Add 1 for the new test file being added this run
-                test_count += 1
+                # Count test functions in the new test file using fixed_test_code
+                # (which is what gets written to disk after import-line fix)
+                test_count += fixed_test_code.count("\ndef test_")
 
             # Update tests badge line - match the exact current format
             # Real format: [![Tests](https://img.shields.io/badge/tests-8%20passed-brightgreen)]()
