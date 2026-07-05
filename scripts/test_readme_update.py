@@ -1,27 +1,13 @@
 #!/usr/bin/env python3
 """
 Test the README update logic.
-This test copies the actual update logic from pick_and_commit.py and runs it.
+This test is SELF-CONTAINED with in-memory fixtures - no external files needed.
 """
 import sys
 import re
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-
-
-def count_tests_in_dir(tests_dir):
-    """Count test functions in test_day_*.py files."""
-    test_count = 0
-    if tests_dir.exists():
-        for test_file in tests_dir.glob("test_day_*.py"):
-            try:
-                content = test_file.read_text()
-                test_count += content.count("\ndef test_")
-            except Exception:
-                pass
-    return test_count
 
 
 def update_readme_progress(readme_content, day, test_count):
@@ -53,37 +39,50 @@ def update_readme_progress(readme_content, day, test_count):
     return readme_content
 
 
+def create_fixture_readme():
+    """Create a self-contained fixture README for testing."""
+    return """# 100 Days of DSA
+
+## Progress
+
+![Days](https://img.shields.io/badge/days-4%20of%20100-blue)
+[![Tests](https://img.shields.io/badge/tests-8%20passed-brightgreen)]()
+
+**Day 4 of 100** ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 4%
+
+| # | Day | Problem | Topic | Difficulty | Solution | Tests |
+|---|-----|---------|-------|------------|----------|-------|
+| 1 | Day 001 | Two Sum | Arrays | Easy | [Solution](./solutions/day_001_two_sum.py) | [Tests](./tests/test_day_001_two_sum.py) |
+| 2 | Day 002 | Add Two Numbers | Linked Lists | Medium | [Solution](./solutions/day_002_add_two_numbers.py) | [Tests](./tests/test_day_002_add_two_numbers.py) |
+| 3 | Day 003 | Longest Substring | Strings | Medium | [Solution](./solutions/day_003_longest_substring.py) | [Tests](./tests/test_day_003_longest_substring.py) |
+| 4 | Day 004 | Median of Two Sorted Arrays | Arrays | Hard | [Solution](./solutions/day_004_median.py) | [Tests](./tests/test_day_004_median.py) |
+
+<!-- PROGRESS_TABLE_END -->
+
+## Usage
+
+1. Solve the problem
+2. Write tests
+3. Submit
+"""
+
+
 def test_readme_update():
     """
     Test that all three README fields update correctly.
-    Uses the ACTUAL regex patterns from pick_and_commit.py against the real README.md.
+    
+    This test is SELF-CONTAINED - uses in-memory fixture data,
+    no external files or paths required.
     
     Key: The tests badge should show TEST COUNT, not DAY COUNT.
     Each day has 2 tests, so with 4 days done: 4 × 2 = 8 tests.
     The badge should show 8, not 4.
     """
-    readme_path = Path("/workspace/project/100-days-of-dsa/README.md")
-    readme_content = readme_path.read_text()
-
-    # Count tests in the actual tests directory
-    tests_dir = Path("/workspace/project/100-days-of-dsa/tests")
-    current_test_count = count_tests_in_dir(tests_dir)
-    print(f"Current test count from existing test files: {current_test_count}")
+    # Use self-contained fixture (4 days = 8 tests)
+    readme_content = create_fixture_readme()
     
-    # Count rows to verify we understand the state
-    progress_section = readme_content[readme_content.find('## Progress'):]
-    table_start = progress_section.find('| # |')
-    table_end = progress_section.find('<!-- PROGRESS_TABLE_END -->')
-    if table_start >= 0 and table_end >= 0:
-        table_content = progress_section[table_start:table_end]
-        lines = table_content.strip().split('\n')
-        row_count = sum(1 for l in lines if l.startswith('| ') and not l.startswith('| # |') and not l.startswith('|---|'))
-    else:
-        row_count = 0
-    
-    print(f"Current row count (days completed): {row_count}")
-    print(f"Expected test count (rows × 2): {row_count * 2}")
-    print()
+    # Initial state: 4 days, 8 tests
+    initial_test_count = 8
 
     # Extract current values before update
     badge_match = re.search(r'(\[!\[Tests\]\(https://img\.shields\.io/badge/tests-)(\d+)(%20passed-brightgreen\)\]\(\))', readme_content)
@@ -93,9 +92,12 @@ def test_readme_update():
     old_day = int(bar_match.group(2)) if bar_match else 0
     old_percent = int(bar_match.group(4).rstrip('%')) if bar_match else 0
 
+    print(f"Fixture: 4 days, 8 tests")
+    print()
+
     # Simulate a "Day 5" run - add 2 more tests for the new day
     new_day = 5
-    new_test_count = current_test_count + 2  # Adding 2 tests for the new day
+    new_test_count = initial_test_count + 2  # Adding 2 tests for the new day
 
     updated_content = update_readme_progress(readme_content, new_day, new_test_count)
 
@@ -108,10 +110,10 @@ def test_readme_update():
     new_percent = int(new_bar_match.group(4).rstrip('%')) if new_bar_match else 0
 
     print("=" * 70)
-    print("README UPDATE TEST")
+    print("README UPDATE TEST (SELF-CONTAINED)")
     print("=" * 70)
     print()
-    print(f"Before update (Day {old_day}, {current_test_count} tests):")
+    print(f"Before update (Day {old_day}, {initial_test_count} tests):")
     print(f"  Day counter: {old_day}")
     print(f"  Tests badge: {old_badge_count}")
     print(f"  Bar percent: {old_percent}%")
@@ -166,6 +168,8 @@ def test_readme_update():
         return 1
     else:
         print("ALL TESTS PASSED!")
+        print()
+        print("Note: This test uses in-memory fixtures - no external files needed.")
         return 0
 
 
