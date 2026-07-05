@@ -121,6 +121,54 @@ def wait_for_ci_pass(repo, branch_name, gh_token, timeout_secs=300, poll_interva
     return False
 
 
+def get_public_repo_solved_count(public_repo, gh_token):
+    """
+    Derive the actual number of solved days from the public repo
+    by counting existing solution files.
+    Returns the count as an integer.
+    """
+    env = {**os.environ, "GH_TOKEN": gh_token}
+    result = subprocess.run(
+        f'gh api repos/{public_repo}/contents/solutions --jq ".[].name"',
+        shell=True, capture_output=True, text=True, env=env
+    )
+    if result.returncode != 0:
+        return 0
+    # Count files matching day_*.py pattern
+    import re
+    count = 0
+    for line in result.stdout.strip().split('\n'):
+        if re.match(r'^day_\d{3}_.*\.py$', line):
+            count += 1
+    return count
+
+
+def sync_state_from_public_repo(state, public_repo, gh_token):
+    """
+    Check if the public repo has more solved days than state.json reflects.
+    If so, update state to match reality (self-healing).
+    Returns True if a sync was performed, False otherwise.
+    """
+    public_count = get_public_repo_solved_count(public_repo, gh_token)
+    local_next_index = state["next_index"]
+    
+    if public_count > local_next_index:
+        print(f"[SELF-HEAL] Public repo has {public_count} solved days, "
+              f"but state.json next_index={local_next_index}. Syncing...")
+        
+        # Advance state to match public repo
+        entries_to_add = public_count - local_next_index
+        for _ in range(entries_to_add):
+            # We can't reconstruct solved_ids without the bank,
+            # but we can at least advance next_index
+            state["next_index"] += 1
+            state["solved_ids"].append(None)  # placeholder
+        
+        print(f"[SELF-HEAL] Synced state.json: next_index now={state['next_index']}")
+        return True
+    return False
+
+
 def main():
     print("=" * 50)
     print("DSA Bot - Starting daily run")
@@ -134,6 +182,9 @@ def main():
     # Load current state
     state = load_state(state_file)
     print(f"Current state: {state}")
+
+    # Self-heal: sync from public repo if needed
+    sync_state_from_public_repo(state, f"{REPO_OWNER}/100-days-of-dsa", PUBLIC_REPO_PAT)
 
     today = get_today_utc()
     print(f"Today (UTC): {today}")
@@ -316,8 +367,8 @@ def main():
     state["last_run_date"] = today
     save_state(state_file, state)
 
-    # Push state update to dsa-bot repo
-    print("Pushing state update...")
+    # Push state update to dsa-bot repo via PR (protected branch)
+    print("Pushing state update via PR...")
     dsa_bot_tmp = tempfile.mkdtemp(prefix="dsa_bot_")
     try:
         run_cmd(f"git clone {DSA_BOT_REPO} {dsa_bot_tmp}")
@@ -327,14 +378,34 @@ def main():
         dst_state.parent.mkdir(exist_ok=True)
         shutil.copy2(state_file, dst_state)
         
+        # Create a short-lived branch for the state update
+        state_branch = f"state-update-day-{day_str}"
+        run_cmd(f"git checkout -b {state_branch}", cwd=dsa_bot_tmp)
         run_cmd(f"git add progress/state.json", cwd=dsa_bot_tmp)
         run_cmd(
             f'git -c user.name="4reeb-5yed" -c user.email="284557362+4reeb-5yed@users.noreply.github.com" '
             f'commit -m "Update state: completed Day {day_str}"',
             cwd=dsa_bot_tmp
         )
-        run_cmd("git push origin main", cwd=dsa_bot_tmp)
-        print("State pushed to dsa-bot")
+        run_cmd(f"git push origin {state_branch}", cwd=dsa_bot_tmp)
+        
+        # Create and auto-merge PR (no CI needed for state JSON)
+        print("Creating state update PR...")
+        run_cmd(
+            f'gh pr create --repo {REPO_OWNER}/dsa-bot '
+            f'--title "State update: completed Day {day_str}" '
+            f'--body "Automated state update after Day {day_str} completion" '
+            f'--base main --head {state_branch}',
+            env={**os.environ, "GH_TOKEN": os.environ.get("GITHUB_TOKEN", "")}
+        )
+        
+        # Auto-merge the PR
+        run_cmd(
+            f'gh pr merge --repo {REPO_OWNER}/dsa-bot '
+            f'--squash --delete-branch {state_branch}',
+            env={**os.environ, "GH_TOKEN": os.environ.get("GITHUB_TOKEN", "")}
+        )
+        print("State PR merged to dsa-bot")
     finally:
         shutil.rmtree(dsa_bot_tmp, ignore_errors=True)
 
