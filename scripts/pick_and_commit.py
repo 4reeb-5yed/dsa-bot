@@ -188,15 +188,33 @@ def main():
         if readme_path.exists():
             with open(readme_path) as f:
                 readme_content = f.read()
+            
             # Insert row before PROGRESS_TABLE_END
             new_row = f"| {day_str} | {title} | {topic} | {difficulty} | {today} |\n"
             readme_content = readme_content.replace(
                 "<!-- PROGRESS_TABLE_END -->",
                 new_row + "<!-- PROGRESS_TABLE_END -->"
             )
+            
+            # Update day counter (e.g., "Day 3 of 100" -> "Day 4 of 100")
+            import re
+            readme_content = re.sub(
+                r'\*\*Day (\d+) of 100\*\*',
+                f'**Day {day} of 100**',
+                readme_content
+            )
+            
+            # Update test count badge (count occurrences of | in progress table rows)
+            row_count = readme_content.count('|', readme_content.find('## Progress')) - 4  # subtract header and border lines
+            readme_content = re.sub(
+                r'\[!\[Tests\]\(https://img\.shields\.io/badge/tests-\d+-%',
+                f'[![Tests](https://img.shields.io/badge/tests-{row_count}-%',
+                readme_content
+            )
+            
             with open(readme_path, 'w') as f:
                 f.write(readme_content)
-            print("Updated README progress table")
+            print(f"Updated README progress table (now at Day {day})")
 
         # Test locally before pushing
         print("\nRunning tests locally...")
