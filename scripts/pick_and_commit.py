@@ -190,7 +190,7 @@ def main():
                 readme_content = f.read()
             
             # Insert row before PROGRESS_TABLE_END
-            new_row = f"| {day_str} | {title} | {topic} | {difficulty} | {today} |\n"
+            new_row = f"| {day_str} | {title} | {topic} | {difficulty} |\n"
             readme_content = readme_content.replace(
                 "<!-- PROGRESS_TABLE_END -->",
                 new_row + "<!-- PROGRESS_TABLE_END -->"
@@ -204,11 +204,23 @@ def main():
                 readme_content
             )
             
-            # Update test count badge (count occurrences of | in progress table rows)
-            row_count = readme_content.count('|', readme_content.find('## Progress')) - 4  # subtract header and border lines
+            # Update test count badge (count table rows)
+            progress_section = readme_content[readme_content.find('## Progress'):]
+            row_count = progress_section.count('|') - 3  # subtract header, borders, and end marker
             readme_content = re.sub(
                 r'\[!\[Tests\]\(https://img\.shields\.io/badge/tests-\d+-%',
                 f'[![Tests](https://img.shields.io/badge/tests-{row_count}-%',
+                readme_content
+            )
+            
+            # Update progress bar (█ characters)
+            bar_width = 50
+            filled = int((day / 100) * bar_width)
+            bar = '█' * filled + '░' * (bar_width - filled)
+            percent = int((day / 100) * 100)
+            readme_content = re.sub(
+                r'\*\*Day \d+ of 100\*\* █+░+\*\* \d+%',
+                f'**Day {day} of 100** {bar} {percent}%',
                 readme_content
             )
             
