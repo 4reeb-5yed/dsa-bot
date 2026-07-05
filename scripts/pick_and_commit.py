@@ -57,7 +57,7 @@ def redact(text):
 
 
 def run_cmd(cmd, cwd=None, env=None, check=True):
-    """Run a command and return stdout."""
+    """Run a command and return stdout. Uses shell=True for shell commands."""
     result = subprocess.run(
         cmd,
         shell=True,
@@ -71,6 +71,26 @@ def run_cmd(cmd, cwd=None, env=None, check=True):
         print(f"stdout: {redact(result.stdout)}", file=sys.stderr)
         print(f"stderr: {redact(result.stderr)}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, cmd)
+    return result.stdout.strip()
+
+
+def run_cmd_list(args, cwd=None, env=None, check=True):
+    """Run a command with explicit argument list (no shell). Returns stdout."""
+    result = subprocess.run(
+        args,
+        shell=False,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True
+    )
+    if check and result.returncode != 0:
+        # For list commands, build a displayable string for error messages
+        cmd_str = " ".join(args)
+        print(f"ERROR: Command failed: {redact(cmd_str)}", file=sys.stderr)
+        print(f"stdout: {redact(result.stdout)}", file=sys.stderr)
+        print(f"stderr: {redact(result.stderr)}", file=sys.stderr)
+        raise subprocess.CalledProcessError(result.returncode, cmd_str)
     return result.stdout.strip()
 
 
@@ -291,13 +311,28 @@ def main():
             bar = '█' * filled + '░' * (bar_width - filled)
             percent = int((day / 100) * 100)
             
+
+            # Count test functions across all existing test files in the checkout
+            # Each day has test_day_XXX_*.py files - count def test_ lines
+            tests_dir = Path(public_tmp) / "tests"
+            test_count = 0
+            if tests_dir.exists():
+                for test_file in tests_dir.glob("test_day_*.py"):
+                    try:
+                        content = test_file.read_text()
+                        test_count += content.count("\\ndef test_")
+                    except Exception:
+                        pass
+                # Add 1 for the new test file being added this run
+                test_count += 1
+
             # Update tests badge line - match the exact current format
             # Real format: [![Tests](https://img.shields.io/badge/tests-8%20passed-brightgreen)]()
             import re
             badge_pattern = r'(\[!\[Tests\]\(https://img\.shields\.io/badge/tests-)(\d+)(%20passed-brightgreen\)\]\(\))'
             readme_content = re.sub(
                 badge_pattern,
-                rf'\g<1>{row_count}\g<3>',
+                rf'\g<1>{test_count}\g<3>',
                 readme_content
             )
             
@@ -338,9 +373,12 @@ def main():
         branch_name = f"day-{day_str}-{slug}"
         run_cmd(f"git checkout -b {branch_name}", cwd=public_tmp)
         run_cmd(f"git add solutions/ tests/ README.md", cwd=public_tmp)
-        run_cmd(
-            f'git -c user.name="4reeb-5yed" -c user.email="284557362+4reeb-5yed@users.noreply.github.com" '
-            f'commit -m "Day {day_str}: {shlex.quote(title)} ({shlex.quote(topic)}, {shlex.quote(difficulty)})"',
+        # Use run_cmd_list (shell=False) to avoid shell injection in commit message
+        commit_msg = f"Day {day_str}: {title} ({topic}, {difficulty})"
+        run_cmd_list(
+            ["git", "-c", "user.name=4reeb-5yed",
+             "-c", "user.email=284557362+4reeb-5yed@users.noreply.github.com",
+             "commit", "-m", commit_msg],
             cwd=public_tmp
         )
         run_cmd(f"git push origin {branch_name}", cwd=public_tmp)
