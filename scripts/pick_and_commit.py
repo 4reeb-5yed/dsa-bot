@@ -11,6 +11,7 @@ import os
 import tempfile
 import subprocess
 import shutil
+import shlex
 import time
 from pathlib import Path
 from datetime import datetime, date
@@ -40,15 +41,15 @@ def save_state(state_path, state):
         json.dump(state, f, indent=2)
 
 
-def redact_cmd(cmd):
-    """Redact sensitive tokens from command string before logging."""
+def redact(text):
+    """Redact sensitive tokens from any string before logging."""
     # Collect all tokens to redact
     tokens_to_redact = [
         os.environ.get("BANK_REPO_PAT", ""),
         os.environ.get("PUBLIC_REPO_PAT", ""),
         os.environ.get("GITHUB_TOKEN", ""),
     ]
-    redacted = cmd
+    redacted = text
     for token in tokens_to_redact:
         if token and token in redacted:
             redacted = redacted.replace(token, "***REDACTED***")
@@ -66,9 +67,9 @@ def run_cmd(cmd, cwd=None, env=None, check=True):
         text=True
     )
     if check and result.returncode != 0:
-        print(f"ERROR: Command failed: {redact_cmd(cmd)}", file=sys.stderr)
-        print(f"stdout: {result.stdout}", file=sys.stderr)
-        print(f"stderr: {result.stderr}", file=sys.stderr)
+        print(f"ERROR: Command failed: {redact(cmd)}", file=sys.stderr)
+        print(f"stdout: {redact(result.stdout)}", file=sys.stderr)
+        print(f"stderr: {redact(result.stderr)}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, cmd)
     return result.stdout.strip()
 
@@ -270,31 +271,42 @@ def main():
                 new_row + "<!-- PROGRESS_TABLE_END -->"
             )
             
-            # Update day counter (e.g., "Day 3 of 100" -> "Day 4 of 100")
-            import re
-            readme_content = re.sub(
-                r'\*\*Day (\d+) of 100\*\*',
-                f'**Day {day} of 100**',
-                readme_content
-            )
+            # Update all three fields robustly by extracting and rebuilding
             
-            # Update test count badge (count table rows)
+            # Count table rows to get the new test count
             progress_section = readme_content[readme_content.find('## Progress'):]
-            row_count = progress_section.count('|') - 3  # subtract header, borders, and end marker
-            readme_content = re.sub(
-                r'\[!\[Tests\]\(https://img\.shields\.io/badge/tests-\d+-%',
-                f'[![Tests](https://img.shields.io/badge/tests-{row_count}-%',
-                readme_content
-            )
+            # Count data rows in the table (between "| # |" header and "<!-- PROGRESS_TABLE_END -->")
+            table_start = progress_section.find('| # |')
+            table_end = progress_section.find('<!-- PROGRESS_TABLE_END -->')
+            if table_start >= 0 and table_end >= 0:
+                table_content = progress_section[table_start:table_end]
+                lines = table_content.strip().split('\n')
+                # Count rows that start with "| " but are not header/separator lines
+                row_count = sum(1 for l in lines if l.startswith('| ') and not l.startswith('| # |') and not l.startswith('|---|'))
+            else:
+                row_count = 0  # fallback
             
-            # Update progress bar (█ characters)
             bar_width = 50
             filled = int((day / 100) * bar_width)
             bar = '█' * filled + '░' * (bar_width - filled)
             percent = int((day / 100) * 100)
+            
+            # Update tests badge line - match the exact current format
+            # Real format: [![Tests](https://img.shields.io/badge/tests-8%20passed-brightgreen)]()
+            import re
+            badge_pattern = r'(\[!\[Tests\]\(https://img\.shields\.io/badge/tests-)(\d+)(%20passed-brightgreen\)\]\(\))'
             readme_content = re.sub(
-                r'\*\*Day \d+ of 100\*\* █+░+\*\* \d+%',
-                f'**Day {day} of 100** {bar} {percent}%',
+                badge_pattern,
+                rf'\g<1>{row_count}\g<3>',
+                readme_content
+            )
+            
+            # Update day counter AND progress bar AND percentage in one pass
+            # Real format: **Day 4 of 100** ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 4%
+            bar_pattern = r'(\*\*Day )(\d+)( of 100\*\* █+░+ )(\d+%)'
+            readme_content = re.sub(
+                bar_pattern,
+                lambda m: f'**Day {day} of 100** {bar} {percent}%',
                 readme_content
             )
             
@@ -328,7 +340,7 @@ def main():
         run_cmd(f"git add solutions/ tests/ README.md", cwd=public_tmp)
         run_cmd(
             f'git -c user.name="4reeb-5yed" -c user.email="284557362+4reeb-5yed@users.noreply.github.com" '
-            f'commit -m "Day {day_str}: {title} ({topic}, {difficulty})"',
+            f'commit -m "Day {day_str}: {shlex.quote(title)} ({shlex.quote(topic)}, {shlex.quote(difficulty)})"',
             cwd=public_tmp
         )
         run_cmd(f"git push origin {branch_name}", cwd=public_tmp)
@@ -339,9 +351,9 @@ def main():
 
         run_cmd(
             f'gh pr create --repo {REPO_OWNER}/100-days-of-dsa '
-            f'--title "Day {day_str}: {title}" '
-            f'--body "{pr_body}" '
-            f'--base main --head {branch_name}',
+            f'--title {shlex.quote(f"Day {day_str}: {title}")} '
+            f'--body {shlex.quote(pr_body)} '
+            f'--base main --head {shlex.quote(branch_name)}',
             env={**os.environ, "GH_TOKEN": PUBLIC_REPO_PAT}
         )
 
