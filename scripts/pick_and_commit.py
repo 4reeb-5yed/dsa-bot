@@ -143,10 +143,11 @@ def get_public_repo_solved_count(public_repo, gh_token):
     return count
 
 
-def sync_state_from_public_repo(state, public_repo, gh_token):
+def sync_state_from_public_repo(state, public_repo, gh_token, bank):
     """
     Check if the public repo has more solved days than state.json reflects.
     If so, update state to match reality (self-healing).
+    Uses real bank entry IDs for solved_ids, not placeholders.
     Returns True if a sync was performed, False otherwise.
     """
     public_count = get_public_repo_solved_count(public_repo, gh_token)
@@ -156,15 +157,22 @@ def sync_state_from_public_repo(state, public_repo, gh_token):
         print(f"[SELF-HEAL] Public repo has {public_count} solved days, "
               f"but state.json next_index={local_next_index}. Syncing...")
         
-        # Advance state to match public repo
+        # Advance state to match public repo using real bank IDs
         entries_to_add = public_count - local_next_index
-        for _ in range(entries_to_add):
-            # We can't reconstruct solved_ids without the bank,
-            # but we can at least advance next_index
+        for i in range(entries_to_add):
+            idx = local_next_index + i  # the bank index to look up
+            if idx < len(bank):
+                entry_id = bank[idx]["id"]
+            else:
+                # Bank doesn't have enough entries, use placeholder but log warning
+                entry_id = None
+                print(f"[SELF-HEAL WARNING] Bank only has {len(bank)} entries, "
+                      f"cannot find real id for index {idx}", file=sys.stderr)
             state["next_index"] += 1
-            state["solved_ids"].append(None)  # placeholder
+            state["solved_ids"].append(entry_id)
         
-        print(f"[SELF-HEAL] Synced state.json: next_index now={state['next_index']}")
+        print(f"[SELF-HEAL] Synced state.json: next_index now={state['next_index']}, "
+              f"solved_ids={state['solved_ids']}")
         return True
     return False
 
@@ -182,9 +190,6 @@ def main():
     # Load current state
     state = load_state(state_file)
     print(f"Current state: {state}")
-
-    # Self-heal: sync from public repo if needed
-    sync_state_from_public_repo(state, f"{REPO_OWNER}/100-days-of-dsa", PUBLIC_REPO_PAT)
 
     today = get_today_utc()
     print(f"Today (UTC): {today}")
@@ -205,6 +210,9 @@ def main():
         print(f"Loaded {len(bank)} problems from bank")
     finally:
         pass  # Keep temp dir for now
+
+    # Self-heal: sync from public repo if needed (after bank is loaded so we have real IDs)
+    sync_state_from_public_repo(state, f"{REPO_OWNER}/100-days-of-dsa", PUBLIC_REPO_PAT, bank)
 
     # Guard: bank exhausted
     if state["next_index"] >= len(bank):
