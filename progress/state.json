@@ -1,5 +1,5 @@
 {
-  "next_index": 20,
+  "next_index": 21,
   "solved_ids": [
     1,
     2,
@@ -20,7 +20,8 @@
     17,
     18,
     19,
-    20
+    20,
+    21
   ],
-  "last_run_date": "2026-07-21"
+  "last_run_date": "2026-07-22"
 }
